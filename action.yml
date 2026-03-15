@@ -1,9 +1,12 @@
-name: 'Publish Debian Repository'
+name: 'Create Debian Repository'
+description: 'Create full debian repository metadata on disk, ready to be served'
 inputs:
   github_token:
     default: ${{ github.token }}
   source:
     default: ${{ github.repository }}
+  archs:
+    default: 'i386 amd64 armhf arm64 mips64el ppc64el riscv64 s390x'
   mode:
     default: write
   directory:
@@ -12,22 +15,29 @@ runs:
   using: composite
   steps:
     - shell: bash
-      run: mkdir -p ${{ inputs.directory }}/dists/stable/main/binary-all ${{ inputs.directory }}/pool/main
+      working-directory: ${{ inputs.directory }}
+      run: mkdir -p pool/main
     - shell: bash
       env:
         GH_TOKEN: ${{ inputs.github_token }}
+      working-directory: ${{ inputs.directory }}
       run: |
-        cd ${{ inputs.directory }}/pool/main
+        cd pool/main
         cat <<< "${{ inputs.source }}" | tr ',' '\n' | tr ';' '\n' | tr ' ' '\n' | xargs -I '{}' gh api /repos/'{}'/releases --paginate | jq '.[] | .assets[] | select(.name | endswith(".deb")) | .url' -c --unbuffered | xargs -r wget --header "Authorization: Bearer $GH_TOKEN" --header 'Accept: application/octet-stream' --tries inf --random-wait -nc
         ls | while read -r file; do mv "$file" "$file".deb; done
     - shell: bash
       working-directory: ${{ inputs.directory }}
-      run: dpkg-scanpackages --multiversion pool/main | tee $( [ ${{ inputs.mode }} = append ] && echo -a || true ) dists/stable/main/binary-all/Packages > /dev/null
-    - shell: bash
-      run: gzip -9 < ${{ inputs.directory }}/dists/stable/main/binary-all/Packages > ${{ inputs.directory }}/dists/stable/main/binary-all/Packages.gz
-    - shell: bash
       run: |
-        cd ${{ inputs.directory }}/dists/stable
+        cat <<< "${{ inputs.archs }}" | tr ',' '\n' | tr ';' '\n' | tr ' ' '\n' | while read -r arch; do
+          mkdir -p dists/stable/main/binary-"$arch"
+          [ ${{ inputs.mode }} = append ] || rm -rf dists/stable/main/binary-"$arch"/Packages
+          dpkg-scanpackages --arch "$arch" pool/main >> dists/stable/main/binary-"$arch"/Packages
+          gzip -9 < dists/stable/main/binary-"$arch"/Packages > dists/stable/main/binary-"$arch"/Packages.gz
+        done
+    - shell: bash
+      working-directory: ${{ inputs.directory }}
+      run: |
+        cd dists/stable
         {
           do_hash() {
               HASH_NAME=$1
