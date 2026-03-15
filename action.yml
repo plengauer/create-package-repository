@@ -6,7 +6,7 @@ inputs:
   source:
     default: ${{ github.repository }}
   archs:
-    default: 'i386 amd64 armhf arm64 mips64el ppc64el riscv64 s390x'
+    default: 'all i386 amd64 armhf arm64 mips64el ppc64el riscv64 s390x'
   mode:
     default: write
   directory:
