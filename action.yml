@@ -26,7 +26,7 @@ runs:
     - shell: bash
       working-directory: ${{ inputs.directory }}
       run: |
-        { echo all; dpkg-architecture -L; } | while read -r arch; do
+        { echo all; dpkg-architecture -L | grep -v -- -; } | while read -r arch; do
           mkdir -p dists/stable/main/binary-"$arch"
           [ ${{ inputs.mode }} = append ] || rm -rf dists/stable/main/binary-"$arch"/Packages
           dpkg-scanpackages --arch "$arch" pool/main >> dists/stable/main/binary-"$arch"/Packages
