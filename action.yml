@@ -18,11 +18,15 @@ runs:
     - shell: bash
       env:
         GH_TOKEN: ${{ inputs.github_token }}
-      working-directory: ${{ inputs.directory }}
+      working-directory: ${{ inputs.directory }}/pool/main
       run: |
-        cd pool/main
-        cat <<< "${{ inputs.source }}" | tr ',' '\n' | tr ';' '\n' | tr ' ' '\n' | xargs -I '{}' gh api /repos/'{}'/releases --paginate | jq '.[] | .assets[] | select(.name | endswith(".deb")) | .url' -c --unbuffered | xargs -r wget --header "Authorization: Bearer $GH_TOKEN" --header 'Accept: application/octet-stream' --tries inf --random-wait -nc
-        ls | while read -r file; do mv "$file" "$file".deb; done
+        cat <<< "${{ inputs.source }}" | tr ',' '\n' | tr ';' '\n' | tr ' ' '\n' | xargs -I '{}' gh api /repos/'{}'/releases --paginate | jq '.[] | .assets[] | select(.name | endswith(".deb")) | .url' -r | xargs -r wget --header "Authorization: Bearer $GH_TOKEN" --header 'Accept: application/octet-stream' --tries inf --random-wait -nc 2> /dev/null
+    - shell: bash
+      working-directory: ${{ inputs.directory }}/pool/main
+      run: |
+        ls | while read -r file; do
+          mv "$file" "$file"_"$(dpkg -I "$file" control | grep 'Architecture:' | cut -d : -f 2 | tr -d ' ')".deb
+        done
     - shell: bash
       working-directory: ${{ inputs.directory }}
       run: |
@@ -30,16 +34,29 @@ runs:
           mkdir -p dists/stable/main/binary-"$arch"
           [ ${{ inputs.mode }} = append ] || rm -rf dists/stable/main/binary-"$arch"/Packages
           dpkg-scanpackages --arch "$arch" pool/main >> dists/stable/main/binary-"$arch"/Packages
-          if ! grep -q "Architecture: $arch" dists/stable/main/binary-"$arch"/Packages; then
-            rm -rf dists/stable/main/binary-"$arch"
-            continue;
-          fi
-          gzip -9 < dists/stable/main/binary-"$arch"/Packages > dists/stable/main/binary-"$arch"/Packages.gz
+          if [ "$(wc -c dists/stable/main/binary-"$arch"/Packages)" = 0 ]; then rm -rf dists/stable/main/binary-"$arch"; fi
         done
     - shell: bash
-      working-directory: ${{ inputs.directory }}
+      working-directory: ${{ inputs.directory }}/pool/main
       run: |
-        cd dists/stable
+        ls | while read -r file; do
+          mv "$file" "${file%%_*.deb}"
+        done
+    - shell: bash
+      working-directory: ${{ inputs.directory }}/dists/stable/main
+      run: |
+        ls | cut -d _ -f 2 | while read -r arch; do 
+          sed -i -E 's/([0-9]+)_'"$arch"'\.deb/\1/g' binary_"$arch"/Packages 
+        done
+    - shell: bash
+      working-directory: ${{ inputs.directory }}/dists/stable/main
+      run: |
+        ls | cut -d _ -f 2 | while read -r arch; do 
+          gzip -9 < binary_"$arch"/Packages > "$directory"/Packages.gz
+        done
+    - shell: bash
+      working-directory: ${{ inputs.directory }}/dists/stable
+      run: |
         {
           do_hash() {
               HASH_NAME=$1
