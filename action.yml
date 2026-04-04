@@ -86,17 +86,14 @@ runs:
           do_hash "SHA256" "sha256sum"
         } > Release
     - shell: bash
-      working-directory: ${{ inputs.directory }}
-      run: mkdir -p rpm
-    - shell: bash
       env:
         GH_TOKEN: ${{ inputs.github_token }}
-      working-directory: ${{ inputs.directory }}/rpm
+      working-directory: ${{ inputs.directory }}
       run: |
         cat <<< "${{ inputs.source }}" | tr ',' '\n' | tr ';' '\n' | tr ' ' '\n' | xargs -I '{}' gh api /repos/'{}'/releases --paginate | jq '.[] | .assets[] | select(.name | endswith(".rpm")) | .url' -r | xargs -r wget --header "Authorization: Bearer $GH_TOKEN" --header 'Accept: application/octet-stream' --tries inf --random-wait -nc 2> /dev/null
     - shell: bash
       working-directory: ${{ inputs.directory }}
       run: |
-        ls rpm/*.rpm 2>/dev/null | head -1 | grep -q . || exit 0
+        ls *.rpm 2>/dev/null | head -1 | grep -q . || exit 0
         sudo apt-get install -y createrepo-c
-        [ ${{ inputs.mode }} = append ] && createrepo_c --update rpm || createrepo_c rpm
+        [ ${{ inputs.mode }} = append ] && createrepo_c --update . || createrepo_c .
