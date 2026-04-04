@@ -1,5 +1,5 @@
-name: 'Create Debian Repository'
-description: 'Create full debian repository metadata on disk, ready to be served'
+name: 'Create Debian/RPM Repository'
+description: 'Create full debian and rpm repository metadata on disk, ready to be served'
 inputs:
   github_token:
     default: ${{ github.token }}
@@ -85,3 +85,18 @@ runs:
           do_hash "SHA1" "sha1sum"
           do_hash "SHA256" "sha256sum"
         } > Release
+    - shell: bash
+      working-directory: ${{ inputs.directory }}
+      run: mkdir -p rpm
+    - shell: bash
+      env:
+        GH_TOKEN: ${{ inputs.github_token }}
+      working-directory: ${{ inputs.directory }}/rpm
+      run: |
+        cat <<< "${{ inputs.source }}" | tr ',' '\n' | tr ';' '\n' | tr ' ' '\n' | xargs -I '{}' gh api /repos/'{}'/releases --paginate | jq '.[] | .assets[] | select(.name | endswith(".rpm")) | .url' -r | xargs -r wget --header "Authorization: Bearer $GH_TOKEN" --header 'Accept: application/octet-stream' --tries inf --random-wait -nc 2> /dev/null
+    - shell: bash
+      working-directory: ${{ inputs.directory }}
+      run: |
+        ls rpm/*.rpm 2>/dev/null | head -1 | grep -q . || exit 0
+        sudo apt-get install -y createrepo-c
+        [ ${{ inputs.mode }} = append ] && createrepo_c --update rpm || createrepo_c rpm
