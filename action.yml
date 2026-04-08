@@ -33,7 +33,7 @@ runs:
         { echo all; dpkg-architecture -L | grep -v -- -; } | while read -r arch; do
           mkdir -p dists/stable/main/binary-"$arch"
           [ ${{ inputs.mode }} = append ] || rm -rf dists/stable/main/binary-"$arch"/Packages
-          dpkg-scanpackages --arch "$arch" pool/main >> dists/stable/main/binary-"$arch"/Packages
+          dpkg-scanpackages --multiversion --arch "$arch" pool/main >> dists/stable/main/binary-"$arch"/Packages
           if [ "$(wc -c dists/stable/main/binary-"$arch"/Packages)" = 0 ]; then rm -rf dists/stable/main/binary-"$arch"; fi
         done
     - shell: bash
