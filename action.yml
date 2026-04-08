@@ -45,14 +45,14 @@ runs:
     - shell: bash
       working-directory: ${{ inputs.directory }}/dists/stable/main
       run: |
-        ls | cut -d _ -f 2 | while read -r arch; do 
-          sed -i -E 's/([0-9]+)_'"$arch"'\.deb/\1/g' binary_"$arch"/Packages 
+        ls | cut -d - -f 2- | while read -r arch; do
+          sed -i -E 's/([0-9]+)_'"$arch"'\.deb/\1/g' binary-"$arch"/Packages 
         done
     - shell: bash
       working-directory: ${{ inputs.directory }}/dists/stable/main
       run: |
-        ls | cut -d _ -f 2 | while read -r arch; do 
-          gzip -9 < binary_"$arch"/Packages > "$directory"/Packages.gz
+        ls | cut -d - -f 2- | while read -r arch; do
+          gzip -9 < binary-"$arch"/Packages > "$directory"/Packages.gz
         done
     - shell: bash
       working-directory: ${{ inputs.directory }}/dists/stable
